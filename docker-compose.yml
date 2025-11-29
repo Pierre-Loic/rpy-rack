@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama:/root/.ollama
+
+  api:
+    build: ./fastapi
+    container_name: rpy-api
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    env_file:
+      - .env
+    volumes:
+      - /sys/class/thermal/thermal_zone0/temp:/host/thermal_zone0_temp:ro
+    ports:
+      - "8000:8000"
