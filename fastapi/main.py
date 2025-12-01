@@ -7,7 +7,7 @@ app = FastAPI()
 
 DEVICE_NAME = os.getenv("DEVICE_NAME", "rpi-unknown")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:270m")
 
 
 class OllamaRequest(BaseModel):
