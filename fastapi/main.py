@@ -41,7 +41,7 @@ def generate_text(req: OllamaRequest):
     }
 
     try:
-        r = requests.post(url, json=payload, timeout=120)
+        r = requests.post(url, json=payload, timeout=300)
         r.raise_for_status()
     except Exception as e:
         print(f"[{DEVICE_NAME}] Erreur appel Ollama: {e}")
