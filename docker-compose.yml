@@ -20,5 +20,9 @@ services:
       - .env
     volumes:
       - /sys/class/thermal/thermal_zone0/temp:/host/thermal_zone0_temp:ro
+      # Métriques système de l'hôte (RAM, charge CPU)
+      - /proc:/host/proc:ro
+      # Fréquence des cœurs du CPU (cpufreq)
+      - /sys/devices/system/cpu:/host/sys_cpu:ro
     ports:
       - "8000:8000"
