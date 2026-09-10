@@ -162,7 +162,9 @@ def generate_text(req: OllamaRequest):
 
         def iter_chunks():
             try:
-                for line in upstream.iter_lines(decode_unicode=True):
+                # chunk_size=None : on ne bufferise pas, chaque token d'Ollama
+                # est relayé dès sa réception (sinon ~512 o de buffer -> stream saccadé).
+                for line in upstream.iter_lines(decode_unicode=True, chunk_size=None):
                     if not line:
                         continue
                     try:
@@ -175,11 +177,18 @@ def generate_text(req: OllamaRequest):
                         "response": chunk.get("response", ""),
                         "done": chunk.get("done", False),
                     }
+                    if chunk.get("done"):
+                        out["eval_count"] = chunk.get("eval_count")
+                        out["prompt_eval_count"] = chunk.get("prompt_eval_count")
                     yield json.dumps(out, ensure_ascii=False) + "\n"
             finally:
                 upstream.close()
 
-        return StreamingResponse(iter_chunks(), media_type="application/x-ndjson")
+        return StreamingResponse(
+            iter_chunks(),
+            media_type="application/x-ndjson",
+            headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+        )
 
     try:
         r = requests.post(url, json=payload, timeout=300)
