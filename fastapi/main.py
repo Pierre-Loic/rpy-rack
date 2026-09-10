@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import json
 import os
 import time
 import requests
@@ -23,6 +25,7 @@ if not os.path.isdir(HOST_CPU):
 class OllamaRequest(BaseModel):
     prompt: str
     model: str | None = None
+    stream: bool = False
 
 
 def _read_temperature_c():
@@ -137,14 +140,46 @@ def get_temperature():
 
 @app.post("/ollama/generate")
 def generate_text(req: OllamaRequest):
-    """Relais vers Ollama local en /api/generate."""
+    """Relais vers Ollama local en /api/generate.
+
+    Si `stream` est vrai, la réponse est renvoyée au fil de l'eau en NDJSON
+    (une ligne JSON par fragment, telle que produite par Ollama)."""
     model = req.model or OLLAMA_MODEL
     url = f"{OLLAMA_BASE_URL}/api/generate"
     payload = {
         "model": model,
         "prompt": req.prompt,
-        "stream": False,
+        "stream": req.stream,
     }
+
+    if req.stream:
+        try:
+            upstream = requests.post(url, json=payload, timeout=300, stream=True)
+            upstream.raise_for_status()
+        except Exception as e:
+            print(f"[{DEVICE_NAME}] Erreur appel Ollama: {e}")
+            raise HTTPException(status_code=502, detail="Erreur lors de l'appel à Ollama")
+
+        def iter_chunks():
+            try:
+                for line in upstream.iter_lines(decode_unicode=True):
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except ValueError:
+                        continue
+                    out = {
+                        "device": DEVICE_NAME,
+                        "model": model,
+                        "response": chunk.get("response", ""),
+                        "done": chunk.get("done", False),
+                    }
+                    yield json.dumps(out, ensure_ascii=False) + "\n"
+            finally:
+                upstream.close()
+
+        return StreamingResponse(iter_chunks(), media_type="application/x-ndjson")
 
     try:
         r = requests.post(url, json=payload, timeout=300)
